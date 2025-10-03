@@ -1,0 +1,9 @@
+{
+    "name": "salvatore/farmacia_project",
+    "version" : "1.0.0", 
+    "description": "Descrizione del progetto",
+    "require": {
+        "php": "^7.4 || ^8.0",
+        "phpmailer/phpmailer": "^6.9"
+    }
+}
