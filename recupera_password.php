@@ -20,8 +20,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $smtp_servers = [
             'gmail' => [
                 'host' => 'smtp.gmail.com',
-                'username' => 'salvatorecitriniti96@gmail.com',  // Sostituisci con la tua email
-                'password' => '30092013m',   // Sostituisci con la tua password (o usa una password per app se hai l'autenticazione 2FA attiva)
+                'username' => '',  // Sostituisci con la tua email
+                'password' => '',   // Sostituisci con la tua password (o usa una password per app se hai l'autenticazione 2FA attiva)
                 'secure' => PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS,
                 'port' => 587
             ]
@@ -114,3 +114,4 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     </div>
 </body>
 </html>
+
