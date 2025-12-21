@@ -2,7 +2,7 @@
 // Configurazione dei dettagli di connessione al database
 $servername = "localhost";    // Indirizzo del server MySQL (di solito "localhost" per XAMPP)
 $username = "root";           // Nome utente di MySQL (di default "root" in XAMPP)
-$password = "root12345";               // Password di MySQL (lascia vuoto per XAMPP)
+$password = "INSERIRE_PASSWORD";               // Password di MySQL (lascia vuoto per XAMPP)
 $dbname = "FarmaciaOspedaliera"; // Nome del database
 
 try {
@@ -13,3 +13,4 @@ try {
     die("Errore di connessione: " . $e->getMessage());
 }
 ?>
+
