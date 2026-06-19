@@ -1,19 +1,23 @@
 <?php
-include 'db.php';  // Connessione al database
+require_once 'db.php';
+require_once 'auth.php';
+requireAuth(['Admin', 'Dottore', 'Dottoressa']);
 
-// Verifica se l'ID del referto è stato passato tramite GET
-if (isset($_GET['id_referto'])) {
-    $id_referto = $_GET['id_referto'];
-
-    // Esegui la query per eliminare il referto
-    $stmt = $pdo->prepare("DELETE FROM RefertiTerapie WHERE ID_Referto = ?");
-    $stmt->execute([$id_referto]);
-
-    // Dopo l'eliminazione, reindirizza alla pagina di gestione referti
+// Solo POST con CSRF
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: gestione_referti.php');
     exit;
-} else {
-    echo "Errore: ID Referto non specificato.";
+}
+verifyCsrf();
+
+$id_referto = (int)($_POST['id_referto'] ?? 0);
+if ($id_referto <= 0) {
+    header('Location: gestione_referti.php');
     exit;
 }
-?>
+
+$stmt = $pdo->prepare("DELETE FROM RefertiTerapie WHERE ID_Referto = ?");
+$stmt->execute([$id_referto]);
+
+header('Location: gestione_referti.php?msg=eliminato');
+exit;

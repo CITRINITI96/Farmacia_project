@@ -1,128 +1,94 @@
 <?php
-include 'db.php';  // Connessione al database
+require_once 'db.php';
+require_once 'auth.php';
+requireAuth(['Admin', 'Dottore', 'Dottoressa']);
 
-// Recupera i reparti per il menu a discesa
-$reparti = $pdo->query("SELECT * FROM Reparto")->fetchAll(PDO::FETCH_ASSOC);
+csrfToken();
 
-// Verifica se il modulo è stato inviato
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // Recupera i dati inviati dal modulo
-    $nome = $_POST['nome'];
-    $cognome = $_POST['cognome'];
-    $data_nascita = $_POST['data_nascita'];
-    $sesso = $_POST['sesso'];
-    $id_reparto = $_POST['id_reparto']; // Recupera l'ID del reparto selezionato
+$reparti = $pdo->query("SELECT * FROM Reparto ORDER BY Nome_Reparto")->fetchAll();
+$error = '';
 
-    // Esegui l'inserimento nel database
-    $stmt = $pdo->prepare("INSERT INTO Paziente (Nome, Cognome, Data_Nascita, Sesso, ID_Reparto) VALUES (?, ?, ?, ?, ?)");
-    $stmt->execute([$nome, $cognome, $data_nascita, $sesso, $id_reparto]);
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verifyCsrf();
 
-    // Dopo l'inserimento, reindirizza alla pagina di gestione pazienti
-    header('Location: paziente.php');
-    exit;
+    $nome         = trim($_POST['nome'] ?? '');
+    $cognome      = trim($_POST['cognome'] ?? '');
+    $data_nascita = $_POST['data_nascita'] ?? '';
+    $sesso        = $_POST['sesso'] ?? '';
+    $id_reparto   = (int)($_POST['id_reparto'] ?? 0);
+
+    if (empty($nome) || empty($cognome) || empty($data_nascita) || empty($sesso) || $id_reparto <= 0) {
+        $error = 'Compila tutti i campi obbligatori.';
+    } else {
+        $stmt = $pdo->prepare("INSERT INTO Paziente (Nome, Cognome, Data_Nascita, Sesso, ID_Reparto) VALUES (?,?,?,?,?)");
+        $stmt->execute([$nome, $cognome, $data_nascita, $sesso, $id_reparto]);
+        header('Location: paziente.php?msg=aggiunto');
+        exit;
+    }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>Aggiungi Paziente</title>
-    <style>
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: linear-gradient(to bottom, #4caf50 50%, #ffffff 50%);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        .form-container {
-            background-color: #ffffff;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            width: 400px;
-            text-align: center;
-        }
-        .form-container h1 {
-            font-size: 24px;
-            color: #4caf50;
-            margin-bottom: 20px;
-        }
-        .form-container label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: bold;
-        }
-        .form-container input, .form-container select {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 20px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-        .form-container input[type="submit"] {
-            background-color: #4caf50;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-        .form-container input[type="submit"]:hover {
-            background-color: #45a049;
-        }
-
-        /* Stile per il pulsante indietro */
-        .back-button {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            background-color: #4caf50; /* Colore verde */
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            text-decoration: none;
-        }
-
-        .back-button:hover {
-            background-color: #45a049;
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aggiungi Paziente — PharmaCare</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="form-container">
-        <h1>Aggiungi Paziente</h1>
-        <form method="POST">
-            <label for="nome">Nome:</label>
-            <input type="text" id="nome" name="nome" required>
+<div class="layout">
+    <?php if ($_SESSION['role'] === 'Admin') include 'sidebar_admin.php'; ?>
 
-            <label for="cognome">Cognome:</label>
-            <input type="text" id="cognome" name="cognome" required>
+    <div class="main-content" style="<?= $_SESSION['role'] !== 'Admin' ? 'margin-left:0' : '' ?>">
+        <div class="page-header">
+            <h1>➕ Aggiungi Paziente</h1>
+        </div>
 
-            <label for="data_nascita">Data di Nascita:</label>
-            <input type="date" id="data_nascita" name="data_nascita" required>
+        <?php if ($error): ?>
+            <div class="alert alert-error">⚠️ <?= htmlspecialchars($error) ?></div>
+        <?php endif; ?>
 
-            <label for="sesso">Sesso:</label>
-            <select id="sesso" name="sesso" required>
-                <option value="M">Maschio</option>
-                <option value="F">Femmina</option>
-            </select>
+        <div style="background:var(--white);border-radius:var(--radius-md);padding:24px;box-shadow:var(--shadow-sm);max-width:560px;">
+            <form method="POST">
+                <?= csrfField() ?>
 
-            <label for="id_reparto">Reparto:</label>
-            <select id="id_reparto" name="id_reparto" required>
-                <?php foreach ($reparti as $reparto): ?>
-                    <option value="<?= $reparto['ID_Reparto'] ?>"><?= $reparto['Nome_Reparto'] ?></option>
-                <?php endforeach; ?>
-            </select>
+                <label for="nome">Nome *</label>
+                <input type="text" id="nome" name="nome" required
+                       value="<?= htmlspecialchars($_POST['nome'] ?? '') ?>">
 
-            <input type="submit" value="Aggiungi Paziente">
-        </form>
+                <label for="cognome">Cognome *</label>
+                <input type="text" id="cognome" name="cognome" required
+                       value="<?= htmlspecialchars($_POST['cognome'] ?? '') ?>">
+
+                <label for="data_nascita">Data di Nascita *</label>
+                <input type="date" id="data_nascita" name="data_nascita" required
+                       value="<?= htmlspecialchars($_POST['data_nascita'] ?? '') ?>">
+
+                <label for="sesso">Sesso *</label>
+                <select id="sesso" name="sesso" required>
+                    <option value="">— Seleziona —</option>
+                    <option value="M" <?= ($_POST['sesso'] ?? '') === 'M' ? 'selected' : '' ?>>Maschio</option>
+                    <option value="F" <?= ($_POST['sesso'] ?? '') === 'F' ? 'selected' : '' ?>>Femmina</option>
+                </select>
+
+                <label for="id_reparto">Reparto *</label>
+                <select id="id_reparto" name="id_reparto" required>
+                    <option value="">— Seleziona reparto —</option>
+                    <?php foreach ($reparti as $reparto): ?>
+                        <option value="<?= (int)$reparto['ID_Reparto'] ?>">
+                            <?= htmlspecialchars($reparto['Nome_Reparto']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+
+                <div style="display:flex;gap:12px;margin-top:20px;">
+                    <button type="submit" class="btn btn-primary">💾 Aggiungi Paziente</button>
+                    <a href="paziente.php" class="btn btn-secondary">Annulla</a>
+                </div>
+            </form>
+        </div>
     </div>
-
-    <!-- Pulsante indietro in basso a sinistra -->
-    <a href="paziente.php" class="button back-button">Indietro</a>
+</div>
+<a href="paziente.php" class="btn-back">← Indietro</a>
 </body>
 </html>

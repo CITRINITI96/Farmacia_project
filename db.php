@@ -1,16 +1,30 @@
 <?php
-// Configurazione dei dettagli di connessione al database
-$servername = "localhost";    // Indirizzo del server MySQL (di solito "localhost" per XAMPP)
-$username = "root";           // Nome utente di MySQL (di default "root" in XAMPP)
-$password = "INSERIRE_PASSWORD";               // Password di MySQL (lascia vuoto per XAMPP)
-$dbname = "FarmaciaOspedaliera"; // Nome del database
+// =============================================
+// CONNESSIONE DATABASE — FILE UNICO
+// Usare SOLO questo file in tutto il progetto.
+// Variabile di connessione: $pdo
+// =============================================
+
+// TODO produzione: spostare queste credenziali in variabili d'ambiente (.env)
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'farmaciaospedaliera');
+define('DB_USER', 'root');
+define('DB_PASS', 'root12345');
+define('DB_CHARSET', 'utf8mb4');
 
 try {
-    // Creazione della connessione PDO
-    $pdo = new PDO("mysql:host=$servername;dbname=$dbname", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdo = new PDO(
+        "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET,
+        DB_USER,
+        DB_PASS,
+        [
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES   => false,
+        ]
+    );
 } catch (PDOException $e) {
-    die("Errore di connessione: " . $e->getMessage());
+    // Logga l'errore reale su file, non esporre dettagli all'utente
+    error_log('[DB ERROR] ' . $e->getMessage(), 3, __DIR__ . '/logs/db_errors.log');
+    die("Errore di connessione al database. Contatta l'amministratore.");
 }
-?>
-

@@ -1,121 +1,121 @@
 <?php
-// Includi la configurazione del database
-require_once 'config.php';
+require_once 'db.php';
+require_once 'auth.php';
+requireAuth('Admin');
 
-// Inizializza la sessione
-session_start();
-
-// Controlla se l'utente è autenticato e se è un admin
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'Admin') {
-    header("Location: login.php"); // Reindirizza alla pagina di login se non è admin
-    exit;
-}
-
-// Se è admin, procedi con il resto della pagina della dashboard
+// Statistiche rapide
+$n_farmaci   = $pdo->query("SELECT COUNT(*) FROM Farmaco")->fetchColumn();
+$n_utenti    = $pdo->query("SELECT COUNT(*) FROM Utente")->fetchColumn();
+$n_notifiche = $pdo->query("SELECT COUNT(*) FROM Notifiche")->fetchColumn();
+$n_ordini    = $pdo->query("SELECT COUNT(*) FROM Ordine_Fornitore WHERE Stato = 'In_Elaborazione'")->fetchColumn();
 ?>
-
 <!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Admin - Farmacia Ospedaliera</title>
+    <title>Dashboard Admin — PharmaCare</title>
+    <link rel="stylesheet" href="style.css">
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f4f4f4;
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+            margin-bottom: 32px;
         }
-        .sidebar {
-            width: 250px;
-            height: 100vh;
-            background-color: #4caf50;
-            color: white;
-            position: fixed;
-            top: 0;
-            left: 0;
-            padding-top: 20px;
-            padding-left: 20px;
+        .kpi-card {
+            background: var(--white);
+            border-radius: var(--radius-md);
+            padding: 20px 24px;
+            box-shadow: var(--shadow-sm);
+            border-left: 4px solid var(--green-500);
+            transition: box-shadow var(--transition), transform var(--transition);
         }
-        .sidebar a {
-            color: white;
-            text-decoration: none;
-            display: block;
-            padding: 10px 15px;
-            margin-bottom: 10px;
-            border-radius: 5px;
+        .kpi-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+        .kpi-card .value { font-size: 2rem; font-weight: 700; color: var(--green-700); }
+        .kpi-card .label { font-size: .82rem; color: var(--gray-700); margin-top: 4px; }
+        .quick-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
         }
-        .sidebar a:hover {
-            background-color: #45a049;
-        }
-        .main-content {
-            margin-left: 250px;
+        .quick-link {
+            background: var(--white);
+            border-radius: var(--radius-md);
             padding: 20px;
+            box-shadow: var(--shadow-sm);
+            text-decoration: none;
+            color: var(--gray-900);
+            transition: box-shadow var(--transition), transform var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 14px;
         }
-        .header {
-            background-color: #4caf50;
-            color: white;
-            padding: 10px 20px;
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .welcome-message {
-            margin-bottom: 30px;
-        }
-        .section {
-            margin-bottom: 20px;
-        }
+        .quick-link:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); text-decoration: none; }
+        .quick-link .icon { font-size: 1.8rem; }
+        .quick-link .title { font-weight: 600; font-size: .95rem; }
+        .quick-link .desc  { font-size: .8rem; color: var(--gray-700); }
     </style>
 </head>
 <body>
+<div class="layout">
+    <?php include 'sidebar_admin.php'; ?>
 
-    <!-- Sidebar -->
-    <div class="sidebar">
-        <h3>Dashboard Admin</h3>
-        <a href="gestione_utenti.php">Gestione Utenti</a>
-        <a href="farmaco.php">Gestione Farmaci</a>
-        <a href="gestione_reparti.php">Gestione Reparti</a>
-        <a href="gestione_referti.php">Gestione Referti</a>
-        <a href="paziente.php">Anagrafica Paziente</a>
-        <a href="ordini_fornitore.php">Gestione Ordini</a>
-        <a href="gestione_fornitori.php">Gestione Fornitori</a>
-        <a href="notifiche.php">Notifiche</a>
-        <a href="magazzino.php">Gestione Magazzini</a>
-        <a href="logout.php">Esci</a>
-    </div>
-
-    <!-- Main content -->
     <div class="main-content">
-        <div class="header">
-            <h1>Benvenuto, <?php echo htmlspecialchars($_SESSION['user_id']); ?>!</h1>
+        <div class="page-header">
+            <h1>Benvenuto, <?= htmlspecialchars($_SESSION['user_id']) ?> 👋</h1>
+            <p style="color:var(--gray-700)">Pannello di controllo della Farmacia Ospedaliera</p>
         </div>
 
-        <div class="welcome-message">
-            <p>Sei nella dashboard di amministrazione. Da qui puoi gestire tutte le funzionalità del sistema.</p>
+        <!-- KPI Cards -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="value"><?= $n_farmaci ?></div>
+                <div class="label">💊 Farmaci in catalogo</div>
+            </div>
+            <div class="kpi-card">
+                <div class="value"><?= $n_utenti ?></div>
+                <div class="label">👥 Utenti registrati</div>
+            </div>
+            <div class="kpi-card" style="border-color:var(--red-600)">
+                <div class="value" style="color:var(--red-600)"><?= $n_notifiche ?></div>
+                <div class="label">🔔 Notifiche attive</div>
+            </div>
+            <div class="kpi-card" style="border-color:#f57c00">
+                <div class="value" style="color:#e65100"><?= $n_ordini ?></div>
+                <div class="label">📦 Ordini in elaborazione</div>
+            </div>
         </div>
 
-        <!-- Section 1: Gestione Utenti -->
-        <div class="section">
-            <h2>Gestione Utenti</h2>
-            <p>Puoi visualizzare, modificare, e gestire gli utenti del sistema.</p>
-            <a href="gestione_utenti.php">Vai alla gestione utenti</a>
-        </div>
-
-        <!-- Section 2: Gestione Farmaci -->
-        <div class="section">
-            <h2>Gestione Farmaci</h2>
-            <p>Puoi aggiungere, modificare e rimuovere farmaci dal sistema.</p>
-            <a href="farmaco.php">Vai alla gestione farmaci</a>
-        </div>
-
-        <!-- Section 3: Impostazioni -->
-        <div class="section">
-            <h2>Notifiche</h2>
-            <p>Visualizza Notifiche presenti.</p>
-            <a href="Notifiche.php">Vai alle Notifiche</a>
+        <!-- Accesso rapido -->
+        <h2>Accesso Rapido</h2>
+        <div class="quick-links">
+            <a href="gestione_utenti.php" class="quick-link">
+                <div class="icon">👥</div>
+                <div><div class="title">Utenti</div><div class="desc">Gestisci gli account</div></div>
+            </a>
+            <a href="farmaco.php" class="quick-link">
+                <div class="icon">💊</div>
+                <div><div class="title">Farmaci</div><div class="desc">Catalogo farmaci</div></div>
+            </a>
+            <a href="notifiche.php" class="quick-link">
+                <div class="icon">🔔</div>
+                <div><div class="title">Notifiche</div><div class="desc">Scorte basse e scadenze</div></div>
+            </a>
+            <a href="gestione_fornitori.php" class="quick-link">
+                <div class="icon">🚚</div>
+                <div><div class="title">Fornitori</div><div class="desc">Gestione fornitori</div></div>
+            </a>
+            <a href="ordini_fornitore.php" class="quick-link">
+                <div class="icon">📦</div>
+                <div><div class="title">Ordini</div><div class="desc">Ordini ai fornitori</div></div>
+            </a>
+            <a href="magazzino.php" class="quick-link">
+                <div class="icon">🏭</div>
+                <div><div class="title">Magazzini</div><div class="desc">Gestione magazzini</div></div>
+            </a>
         </div>
     </div>
-
+</div>
 </body>
 </html>
