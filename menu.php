@@ -1,16 +1,6 @@
 <?php
-session_start();
-
-// Verifica se l'utente è autenticato
-if (!isset($_SESSION['user_id']) || !isset($_SESSION['role'])) {
-    header("Location: login.php");
-    exit;
-}
-
-// Titolo della pagina
-$title = "Menu Farmacia Ospedaliera";
-
-// Ruolo dell'utente
+require_once 'auth.php';
+requireAuth(); // qualsiasi ruolo loggato
 $role = $_SESSION['role'];
 ?>
 <!DOCTYPE html>
@@ -18,74 +8,110 @@ $role = $_SESSION['role'];
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $title; ?></title>
+    <title>Menu — PharmaCare</title>
+    <link rel="stylesheet" href="style.css">
     <style>
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            height: 100vh;
-            background: linear-gradient(to bottom, #4caf50 50%, #ffffff 50%);
-            display: flex;
-            justify-content: center;
-            align-items: center;
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 14px;
+            margin-top: 20px;
         }
-        .menu-container {
-            background-color: #ffffff;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        .menu-item {
+            background: var(--white);
+            border: 2px solid var(--green-100);
+            border-radius: var(--radius-md);
+            padding: 22px 16px;
             text-align: center;
-            width: 300px;
-        }
-        .menu-container h1 {
-            font-size: 28px;
-            font-weight: bold;
-            color: #4caf50;
-            margin-bottom: 20px;
-        }
-        .menu-container a {
-            display: block;
-            font-size: 18px;
-            color: #4caf50;
             text-decoration: none;
-            padding: 10px;
-            margin: 10px 0;
-            border: 2px solid #4caf50;
-            border-radius: 5px;
+            color: var(--green-700);
+            font-weight: 600;
+            font-size: .95rem;
+            transition: all var(--transition);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
         }
-        .menu-container a:hover {
-            background-color: #4caf50;
-            color: white;
+        .menu-item .icon { font-size: 1.8rem; }
+        .menu-item:hover {
+            background: var(--green-500);
+            color: var(--white);
+            border-color: var(--green-500);
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-md);
+            text-decoration: none;
+        }
+        .menu-item.logout { border-color: var(--red-100); color: var(--red-600); }
+        .menu-item.logout:hover { background: var(--red-600); border-color: var(--red-600); color: var(--white); }
+        .role-badge {
+            display: inline-block;
+            background: rgba(255,255,255,.2);
+            border: 1px solid rgba(255,255,255,.4);
+            padding: 4px 12px;
+            border-radius: 50px;
+            font-size: .82rem;
+            margin-top: 6px;
         }
     </style>
 </head>
 <body>
+<div class="page-center" style="flex-direction:column;align-items:center;">
+    <div class="card card-wide">
+        <div class="card-header" style="margin-bottom:0">
+            <div class="brand">💊 PharmaCare</div>
+            <p style="color:var(--gray-700);margin-top:4px;">
+                Bentornato, <strong><?= htmlspecialchars($_SESSION['user_id']) ?></strong>
+                <span class="badge badge-success" style="margin-left:6px;"><?= htmlspecialchars($role) ?></span>
+            </p>
+        </div>
 
-    <div class="menu-container">
-        <h1>Menu Farmacia Ospedaliera</h1>
+        <div class="menu-grid">
+            <?php if (in_array($role, ['Dottore', 'Dottoressa'])): ?>
+                <a href="paziente.php" class="menu-item">
+                    <span class="icon">🧑‍⚕️</span> Pazienti
+                </a>
+                <a href="gestione_reparti.php" class="menu-item">
+                    <span class="icon">🏥</span> Reparti
+                </a>
+                <a href="gestione_referti.php" class="menu-item">
+                    <span class="icon">📋</span> Referti
+                </a>
+            <?php endif; ?>
 
-        <!-- Menu personalizzato in base al ruolo -->
-        <?php if ($role === 'Dottore' || $role === 'Dottoressa'): ?>
-            <a href="paziente.php">Anagrafica Paziente</a>
-            <a href="gestione_reparti.php">Gestione Reparti</a>
-            <a href="gestione_referti.php">Gestione Referti</a>
-        <?php endif; ?>
+            <?php if ($role === 'Farmacista'): ?>
+                <a href="farmaco.php" class="menu-item">
+                    <span class="icon">💊</span> Farmaci
+                </a>
+                <a href="ordini_fornitore.php" class="menu-item">
+                    <span class="icon">📦</span> Ordini
+                </a>
+                <a href="gestione_fornitori.php" class="menu-item">
+                    <span class="icon">🚚</span> Fornitori
+                </a>
+                <a href="notifiche.php" class="menu-item">
+                    <span class="icon">🔔</span> Notifiche
+                </a>
+            <?php endif; ?>
 
-        <?php if ($role === 'Farmacista'): ?>
-            <a href="farmaco.php">Gestione Farmaci</a>
-            <a href="ordini_fornitore.php">Gestione Ordini</a>
-            <a href="gestione_fornitori.php">Gestione Fornitori</a>
-            <a href="notifiche.php">Notifiche</a>
-        <?php endif; ?>
+            <?php if ($role === 'Magazziniere'): ?>
+                <a href="ordini_fornitore.php" class="menu-item">
+                    <span class="icon">📦</span> Ordini
+                </a>
+                <a href="magazzino.php" class="menu-item">
+                    <span class="icon">🏭</span> Magazzini
+                </a>
+                <a href="stock.php" class="menu-item">
+                    <span class="icon">📊</span> Stock
+                </a>
+            <?php endif; ?>
 
-        <?php if ($role === 'Magazziniere'): ?>
-            <a href="ordini_fornitore.php">Gestione Ordini</a>
-            <a href="magazzino.php">Gestione Magazzini</a>
-        <?php endif; ?>
-
-        <!-- Link comune per tutti gli utenti -->
-        <a href="logout.php">Logout</a>
+            <a href="logout.php" class="menu-item logout">
+                <span class="icon">🚪</span> Logout
+            </a>
+        </div>
     </div>
+</div>
 <?php include 'footer.php'; ?>
 </body>
 </html>

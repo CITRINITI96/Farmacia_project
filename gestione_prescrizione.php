@@ -1,146 +1,99 @@
 <?php
-include 'db.php';  // Assicurati di avere il file db.php che gestisce la connessione al database
+require_once 'db.php';
+require_once 'auth.php';
+requireAuth(['Admin', 'Dottore', 'Dottoressa']);
 
-// Controlla se l'ID del paziente è stato passato tramite GET
-if (isset($_GET['id_paziente'])) {
-    $id_paziente = $_GET['id_paziente'];
+csrfToken();
 
-    // Query per recuperare le prescrizioni del paziente
-    $stmt = $pdo->prepare("SELECT p.ID_Paziente, p.ID_Farmaco, p.Quantità, p.Data_Prescrizione
-                           FROM Prescrizione p
-                           WHERE p.ID_Paziente = ?");
-    $stmt->execute([$id_paziente]);
-
-    // Ottieni tutte le prescrizioni
-    $prescrizioni = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} else {
-    echo "Errore: ID paziente non specificato.";
+$id_paziente = (int)($_GET['id_paziente'] ?? 0);
+if ($id_paziente <= 0) {
+    header('Location: paziente.php');
     exit;
 }
-?>
 
+$flash = '';
+if (isset($_GET['msg'])) {
+    $msgs = [
+        'aggiunto'  => 'Prescrizione aggiunta con successo.',
+        'modificato'=> 'Prescrizione modificata.',
+        'eliminato' => 'Prescrizione eliminata.',
+    ];
+    $flash = $msgs[$_GET['msg']] ?? '';
+}
+
+$stmt = $pdo->prepare("SELECT p.ID_Paziente, p.ID_Farmaco, f.Nome AS Nome_Farmaco, p.Quantità, p.Data_Prescrizione
+                       FROM Prescrizione p
+                       JOIN Farmaco f ON p.ID_Farmaco = f.ID_Farmaco
+                       WHERE p.ID_Paziente = ?
+                       ORDER BY p.Data_Prescrizione DESC");
+$stmt->execute([$id_paziente]);
+$prescrizioni = $stmt->fetchAll();
+?>
 <!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>Gestione Prescrizioni</title>
-    <style>
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: linear-gradient(to bottom, #4caf50 50%, #ffffff 50%);
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .form-container {
-            background-color: #ffffff;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            width: 80%;
-            text-align: center;
-        }
-        .form-container h1 {
-            font-size: 24px;
-            color: #4caf50;
-            margin-bottom: 20px;
-        }
-        .form-container table {
-            width: 100%;
-            margin-top: 20px;
-            border-collapse: collapse;
-        }
-        .form-container table th,
-        .form-container table td {
-            padding: 10px;
-            border: 1px solid #ddd;
-            text-align: center;
-        }
-        .form-container table th {
-            background-color: #4caf50;
-            color: white;
-        }
-        .form-container table tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-        .form-container table tr:hover {
-            background-color: #e2e2e2;
-        }
-        .button {
-            background-color: #4caf50;
-            color: white;
-            padding: 5px 10px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            text-decoration: none;
-        }
-        .button:hover {
-            background-color: #45a049;
-        }
-        .add-button {
-            background-color: #007bff;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            text-decoration: none;
-            margin-bottom: 20px;
-        }
-        .add-button:hover {
-            background-color: #0056b3;
-        }
-        /* Stile per il pulsante indietro */
-        .back-button {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            background-color: #4caf50;  /* Colore verde */
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            text-decoration: none;
-            display: inline-block;
-        }
-        .back-button:hover {
-            background-color: #45a049;
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prescrizioni Paziente — PharmaCare</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="form-container">
-        <h1>Gestione Prescrizioni - Paziente</h1>
-        <a href="aggiungi_prescrizione.php?id_paziente=<?= $id_paziente ?>" class="add-button">Aggiungi Nuova Prescrizione</a>
-        <table>
-            <tr>
-                <th>ID Paziente</th>
-                <th>ID Farmaco</th>
-                <th>Quantità</th>
-                <th>Data Prescrizione</th>
-                <th>Modifica</th>
-                <th>Elimina</th>
-            </tr>
-            <?php foreach ($prescrizioni as $prescrizione): ?>
-                <tr>
-                    <td><?= $prescrizione['ID_Paziente'] ?></td>
-                    <td><?= $prescrizione['ID_Farmaco'] ?></td>
-                    <td><?= $prescrizione['Quantità'] ?></td>
-                    <td><?= $prescrizione['Data_Prescrizione'] ?></td>
-                    <td>
-                        <a href="modifica_prescrizione.php?id_paziente=<?= $prescrizione['ID_Paziente'] ?>&id_farmaco=<?= $prescrizione['ID_Farmaco'] ?>&data_prescrizione=<?= $prescrizione['Data_Prescrizione'] ?>" class="button">Modifica</a>
-                    </td>
-                    <td>
-                        <a href="elimina_prescrizione.php?id_paziente=<?= $prescrizione['ID_Paziente'] ?>&id_farmaco=<?= $prescrizione['ID_Farmaco'] ?>&data_prescrizione=<?= $prescrizione['Data_Prescrizione'] ?>" class="button" onclick="return confirm('Sei sicuro di voler eliminare questa prescrizione?');">Elimina</a>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-        </table>
-    </div>
+<div class="layout">
+    <?php if ($_SESSION['role'] === 'Admin') include 'sidebar_admin.php'; ?>
 
-    <!-- Pulsante Indietro -->
-    <a href="paziente.php" class="back-button">Indietro</a>
+    <div class="main-content" style="<?= $_SESSION['role'] !== 'Admin' ? 'margin-left:0' : '' ?>">
+        <div class="page-header flex justify-between items-center">
+            <h1>📋 Prescrizioni — Paziente #<?= $id_paziente ?></h1>
+            <a href="aggiungi_prescrizione.php?id_paziente=<?= $id_paziente ?>" class="btn btn-primary">➕ Nuova Prescrizione</a>
+        </div>
+
+        <?php if ($flash): ?>
+            <div class="alert alert-success">✅ <?= htmlspecialchars($flash) ?></div>
+        <?php endif; ?>
+
+        <div style="background:var(--white);border-radius:var(--radius-md);padding:24px;box-shadow:var(--shadow-sm);">
+            <h2>📋 Elenco Prescrizioni (<?= count($prescrizioni) ?>)</h2>
+            <div class="table-wrapper table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID Paziente</th>
+                            <th>Farmaco</th>
+                            <th>Quantità</th>
+                            <th>Data Prescrizione</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($prescrizioni as $p): ?>
+                        <tr>
+                            <td><?= (int)$p['ID_Paziente'] ?></td>
+                            <td><?= htmlspecialchars($p['Nome_Farmaco']) ?></td>
+                            <td><?= (int)$p['Quantità'] ?></td>
+                            <td><?= htmlspecialchars($p['Data_Prescrizione']) ?></td>
+                            <td class="actions-cell">
+                                <a href="modifica_prescrizione.php?id_paziente=<?= (int)$p['ID_Paziente'] ?>&id_farmaco=<?= (int)$p['ID_Farmaco'] ?>&data_prescrizione=<?= urlencode($p['Data_Prescrizione']) ?>"
+                                   class="btn btn-sm btn-secondary">✏️ Modifica</a>
+                                <form method="post" action="elimina_prescrizione.php" class="inline"
+                                      onsubmit="return confirm('Eliminare questa prescrizione?')">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="id_paziente" value="<?= (int)$p['ID_Paziente'] ?>">
+                                    <input type="hidden" name="id_farmaco" value="<?= (int)$p['ID_Farmaco'] ?>">
+                                    <input type="hidden" name="data_prescrizione" value="<?= htmlspecialchars($p['Data_Prescrizione']) ?>">
+                                    <button type="submit" class="btn btn-sm btn-danger">🗑️ Elimina</button>
+                                </form>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($prescrizioni)): ?>
+                        <tr><td colspan="5" class="text-center" style="color:var(--gray-700);padding:20px">Nessuna prescrizione.</td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<a href="paziente.php" class="btn-back">← Indietro ai Pazienti</a>
 </body>
 </html>

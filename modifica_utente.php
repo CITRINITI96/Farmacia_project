@@ -1,145 +1,123 @@
 <?php
-// Includi la configurazione del database
-require_once 'config.php';
-session_start();
+require_once 'db.php';
+require_once 'auth.php';
+requireAuth('Admin');
 
-// Controlla se l'utente è autenticato e se è un admin
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'Admin') {
-    header("Location: login.php");
+csrfToken();
+
+$id = (int)($_GET['id'] ?? 0);
+if ($id <= 0) {
+    header('Location: gestione_utenti.php');
     exit;
 }
 
-// Verifica se è stato passato un ID tramite GET
-if (!isset($_GET['id'])) {
-    header("Location: gestione_utenti.php");
-    exit;
-}
-
-$userId = $_GET['id']; // Questo è l'ID_Utente
-
-// Recupera i dati dell'utente da modificare
-$query = "SELECT * FROM Utente WHERE ID_Utente = :id";
-$stmt = $conn->prepare($query);
-$stmt->bindParam(':id', $userId, PDO::PARAM_INT);
-$stmt->execute();
-$utente = $stmt->fetch(PDO::FETCH_ASSOC);
-
+// Recupera utente
+$stmt = $pdo->prepare("SELECT * FROM Utente WHERE ID_Utente = ?");
+$stmt->execute([$id]);
+$utente = $stmt->fetch();
 if (!$utente) {
-    header("Location: gestione_utenti.php");
+    header('Location: gestione_utenti.php');
     exit;
 }
 
-// Gestione della modifica dell'utente
+$error = '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = $_POST['username'];
-    $nome = $_POST['nome'];
-    $cognome = $_POST['cognome'];
-    $ruolo = $_POST['ruolo'];
+    verifyCsrf();
 
-    $query = "UPDATE Utente SET username = :username, Nome = :nome, Cognome = :cognome, Ruolo = :ruolo WHERE ID_Utente = :id";
-    $stmt = $conn->prepare($query);
-    $stmt->bindParam(':username', $username);
-    $stmt->bindParam(':nome', $nome);
-    $stmt->bindParam(':cognome', $cognome);
-    $stmt->bindParam(':ruolo', $ruolo);
-    $stmt->bindParam(':id', $userId, PDO::PARAM_INT);
+    $username = trim($_POST['username'] ?? '');
+    $nome     = trim($_POST['nome'] ?? '');
+    $cognome  = trim($_POST['cognome'] ?? '');
+    $email    = trim($_POST['email'] ?? '');
+    $ruolo    = $_POST['ruolo'] ?? '';
 
-    if ($stmt->execute()) {
-        header("Location: gestione_utenti.php");
-        exit;
+    $valid_roles = ['Admin', 'Dottore', 'Dottoressa', 'Magazziniere', 'Farmacista'];
+
+    if (empty($username) || empty($nome) || empty($cognome) || empty($ruolo)) {
+        $error = 'Compila tutti i campi obbligatori.';
+    } elseif (!in_array($ruolo, $valid_roles, true)) {
+        $error = 'Ruolo non valido.';
     } else {
-        $error = "Errore nel salvataggio dei dati.";
+        try {
+            $stmt2 = $pdo->prepare(
+                "UPDATE Utente SET username=:username, Nome=:nome, Cognome=:cognome, Email=:email, Ruolo=:ruolo WHERE ID_Utente=:id"
+            );
+            $stmt2->execute([
+                ':username' => $username,
+                ':nome'     => $nome,
+                ':cognome'  => $cognome,
+                ':email'    => $email,
+                ':ruolo'    => $ruolo,
+                ':id'       => $id,
+            ]);
+            header('Location: gestione_utenti.php?msg=modificato');
+            exit;
+        } catch (PDOException $e) {
+            if ($e->getCode() == 23000) {
+                $error = 'Username o email già in uso.';
+            } else {
+                error_log('[MODIFICA_UTENTE] ' . $e->getMessage());
+                $error = 'Errore nel salvataggio dei dati.';
+            }
+        }
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Modifica Utente</title>
-    <style>
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: linear-gradient(to bottom, #4caf50 50%, #ffffff 50%);
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .container {
-            background-color: #ffffff;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            text-align: center;
-            width: 300px;
-        }
-        .container h1 {
-            font-size: 24px;
-            color: #4caf50;
-            margin-bottom: 20px;
-        }
-        .container label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: bold;
-        }
-        .container input[type="text"],
-        .container select {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 20px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            box-sizing: border-box;
-        }
-        .container button {
-            background-color: #4caf50;
-            color: white;
-            padding: 10px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            width: 100%;
-        }
-        .container button:hover {
-            background-color: #45a049;
-        }
-        .error {
-            color: red;
-            font-size: 14px;
-            margin-top: 10px;
-        }
-    </style>
+    <title>Modifica Utente — PharmaCare</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Modifica Utente</h1>
-        <?php if (isset($error)) { echo "<p class='error'>" . htmlspecialchars($error) . "</p>"; } ?>
-        <form method="POST" action="">
-            <label for="username">Username:</label>
-            <input type="text" id="username" name="username" value="<?php echo htmlspecialchars($utente['username']); ?>" required>
-            
-            <label for="nome">Nome:</label>
-            <input type="text" id="nome" name="nome" value="<?php echo htmlspecialchars($utente['Nome']); ?>" required>
-            
-            <label for="cognome">Cognome:</label>
-            <input type="text" id="cognome" name="cognome" value="<?php echo htmlspecialchars($utente['Cognome']); ?>" required>
-            
-            <label for="ruolo">Ruolo:</label>
-            <select id="ruolo" name="ruolo" required>
-                <option value="Admin" <?php echo ($utente['Ruolo'] === 'Admin') ? 'selected' : ''; ?>>Admin</option>
-                <option value="Dottore" <?php echo ($utente['Ruolo'] === 'Dottore') ? 'selected' : ''; ?>>Dottore</option>
-                <option value="Dottoressa" <?php echo ($utente['Ruolo'] === 'Dottoressa') ? 'selected' : ''; ?>>Dottoressa</option>
-                <option value="Magazziniere" <?php echo ($utente['Ruolo'] === 'Magazziniere') ? 'selected' : ''; ?>>Magazziniere</option>
-                <option value="Farmacista" <?php echo ($utente['Ruolo'] === 'Farmacista') ? 'selected' : ''; ?>>Farmacista</option>
-            </select>
-            
-            <button type="submit">Salva Modifiche</button>
-        </form>
+<div class="layout">
+    <?php include 'sidebar_admin.php'; ?>
+
+    <div class="main-content">
+        <div class="page-header">
+            <h1>✏️ Modifica Utente</h1>
+        </div>
+
+        <?php if ($error): ?>
+            <div class="alert alert-error">⚠️ <?= htmlspecialchars($error) ?></div>
+        <?php endif; ?>
+
+        <div style="background:var(--white);border-radius:var(--radius-md);padding:24px;box-shadow:var(--shadow-sm);max-width:560px;">
+            <form method="POST">
+                <?= csrfField() ?>
+
+                <label for="username">Username *</label>
+                <input type="text" id="username" name="username" required
+                       value="<?= htmlspecialchars($_POST['username'] ?? $utente['username']) ?>">
+
+                <label for="nome">Nome *</label>
+                <input type="text" id="nome" name="nome" required
+                       value="<?= htmlspecialchars($_POST['nome'] ?? $utente['Nome']) ?>">
+
+                <label for="cognome">Cognome *</label>
+                <input type="text" id="cognome" name="cognome" required
+                       value="<?= htmlspecialchars($_POST['cognome'] ?? $utente['Cognome']) ?>">
+
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email"
+                       value="<?= htmlspecialchars($_POST['email'] ?? ($utente['Email'] ?? '')) ?>">
+
+                <label for="ruolo">Ruolo *</label>
+                <select id="ruolo" name="ruolo" required>
+                    <?php foreach (['Admin','Dottore','Dottoressa','Farmacista','Magazziniere'] as $r): ?>
+                        <option value="<?= $r ?>" <?= ($utente['Ruolo'] === $r) ? 'selected' : '' ?>><?= $r ?></option>
+                    <?php endforeach; ?>
+                </select>
+
+                <div style="display:flex;gap:12px;margin-top:20px;">
+                    <button type="submit" class="btn btn-primary">💾 Salva Modifiche</button>
+                    <a href="gestione_utenti.php" class="btn btn-secondary">Annulla</a>
+                </div>
+            </form>
+        </div>
     </div>
+</div>
 </body>
 </html>

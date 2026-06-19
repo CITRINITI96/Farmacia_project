@@ -1,236 +1,160 @@
 <?php
-require_once 'config.php'; // Assicurati che il file di configurazione includa la connessione al database $conn
+require_once 'db.php';
+require_once 'auth.php';
+requireAuth(['Admin', 'Farmacista']);
 
-$error = '';
-$success = '';
+csrfToken();
 
-// Aggiunta di un nuovo fornitore
+$message = '';
+$msgType = 'success';
+
+// Aggiungi fornitore
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_supplier'])) {
-    $nome = $_POST['nome'];
-    $indirizzo = $_POST['indirizzo'];
-    $telefono = $_POST['telefono'];
-    $email = $_POST['email'];
+    verifyCsrf();
+    $nome      = trim($_POST['nome'] ?? '');
+    $indirizzo = trim($_POST['indirizzo'] ?? '');
+    $telefono  = trim($_POST['telefono'] ?? '');
+    $email     = trim($_POST['email'] ?? '');
 
     if ($nome && $indirizzo && $telefono && $email) {
-        $query = "INSERT INTO Fornitori (Nome, Indirizzo, Telefono, Email) VALUES (:nome, :indirizzo, :telefono, :email)";
-        $stmt = $conn->prepare($query);
-        $stmt->bindParam(':nome', $nome);
-        $stmt->bindParam(':indirizzo', $indirizzo);
-        $stmt->bindParam(':telefono', $telefono);
-        $stmt->bindParam(':email', $email);
-        if ($stmt->execute()) {
-            $success = 'Fornitore aggiunto con successo!';
-        } else {
-            $error = 'Errore nell\'aggiunta del fornitore.';
-        }
+        $stmt = $pdo->prepare("INSERT INTO Fornitori (Nome, Indirizzo, Telefono, Email) VALUES (?,?,?,?)");
+        $stmt->execute([$nome, $indirizzo, $telefono, $email]);
+        header('Location: gestione_fornitori.php?msg=aggiunto');
+        exit;
     } else {
-        $error = 'Tutti i campi sono obbligatori.';
+        $message = 'Tutti i campi sono obbligatori.';
+        $msgType = 'error';
     }
 }
 
-// Eliminazione di un fornitore
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_supplier'])) {
-    $id = $_POST['id'];
-    $query = "DELETE FROM Fornitori WHERE ID_Fornitore = :id";
-    $stmt = $conn->prepare($query);
-    $stmt->bindParam(':id', $id);
-    if ($stmt->execute()) {
-        $success = 'Fornitore eliminato con successo!';
-    } else {
-        $error = 'Errore nell\'eliminazione del fornitore.';
-    }
-}
-
-// Modifica di un fornitore
+// Modifica fornitore
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_supplier'])) {
-    $id = $_POST['id'];
-    $nome = $_POST['nome'];
-    $indirizzo = $_POST['indirizzo'];
-    $telefono = $_POST['telefono'];
-    $email = $_POST['email'];
+    verifyCsrf();
+    $id        = (int)$_POST['id'];
+    $nome      = trim($_POST['nome'] ?? '');
+    $indirizzo = trim($_POST['indirizzo'] ?? '');
+    $telefono  = trim($_POST['telefono'] ?? '');
+    $email     = trim($_POST['email'] ?? '');
 
     if ($nome && $indirizzo && $telefono && $email) {
-        $query = "UPDATE Fornitori SET Nome = :nome, Indirizzo = :indirizzo, Telefono = :telefono, Email = :email WHERE ID_Fornitore = :id";
-        $stmt = $conn->prepare($query);
-        $stmt->bindParam(':id', $id);
-        $stmt->bindParam(':nome', $nome);
-        $stmt->bindParam(':indirizzo', $indirizzo);
-        $stmt->bindParam(':telefono', $telefono);
-        $stmt->bindParam(':email', $email);
-        if ($stmt->execute()) {
-            $success = 'Fornitore aggiornato con successo!';
-        } else {
-            $error = 'Errore nell\'aggiornamento del fornitore.';
-        }
+        $stmt = $pdo->prepare("UPDATE Fornitori SET Nome=?, Indirizzo=?, Telefono=?, Email=? WHERE ID_Fornitore=?");
+        $stmt->execute([$nome, $indirizzo, $telefono, $email, $id]);
+        header('Location: gestione_fornitori.php?msg=modificato');
+        exit;
     } else {
-        $error = 'Tutti i campi sono obbligatori per la modifica.';
+        $message = 'Tutti i campi sono obbligatori per la modifica.';
+        $msgType = 'error';
     }
 }
 
-// Recupero dei fornitori
-$query = "SELECT * FROM Fornitori";
-$stmt = $conn->prepare($query);
-$stmt->execute();
-$fornitori = $stmt->fetchAll(PDO::FETCH_ASSOC);
-?>
+// Elimina fornitore
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_supplier'])) {
+    verifyCsrf();
+    $id = (int)$_POST['id'];
+    $stmt = $pdo->prepare("DELETE FROM Fornitori WHERE ID_Fornitore=?");
+    $stmt->execute([$id]);
+    header('Location: gestione_fornitori.php?msg=eliminato');
+    exit;
+}
 
+// Flash message
+if (isset($_GET['msg'])) {
+    $msgs = ['aggiunto' => 'Fornitore aggiunto con successo.', 'modificato' => 'Fornitore modificato.', 'eliminato' => 'Fornitore eliminato.'];
+    $message = $msgs[$_GET['msg']] ?? '';
+}
+
+$fornitori = $pdo->query("SELECT * FROM Fornitori ORDER BY Nome")->fetchAll();
+?>
 <!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestione Fornitori</title>
+    <title>Gestione Fornitori — PharmaCare</title>
+    <link rel="stylesheet" href="style.css">
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background: linear-gradient(to bottom, #4caf50 50%, #ffffff 50%);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-        .container {
-            padding: 20px;
-            margin: auto;
-            width: 80%;
-            max-width: 1200px;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-        }
-        h1 {
-            text-align: center;
-            color: #4caf50;
-        }
-        .message {
-            margin: 10px 0;
-            padding: 10px;
-            border-radius: 5px;
-        }
-        .message.success {
-            background-color: #d4edda;
-            color: #155724;
-        }
-        .message.error {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-        form {
-            margin-bottom: 20px;
-        }
-        form input, form button {
-            padding: 10px;
-            margin: 5px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-        }
-        form button {
-            background-color: #4caf50;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-        form button:hover {
-            background-color: #45a049;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        table, th, td {
-            border: 1px solid #ccc;
-        }
-        th, td {
-            padding: 10px;
-            text-align: left;
-        }
-        th {
-            background-color: #4caf50;
-            color: white;
-        }
-        .scrollable-table {
-            max-height: 300px;
-            overflow-y: auto;
-            margin-top: 10px;
-        }
-        .back-button {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            padding: 10px 20px;
-            background-color: #4caf50;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            border: none;
-        }
-        .back-button:hover {
-            background-color: #45a049;
-        }
+        .edit-form { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:4px; }
+        .edit-form input { flex:1; min-width:90px; padding:5px 8px; font-size:.82rem; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Gestione Fornitori</h1>
+<div class="layout">
+    <?php if ($_SESSION['role'] === 'Admin') include 'sidebar_admin.php'; ?>
 
-        <?php if ($success): ?>
-            <div class="message success"><?php echo $success; ?></div>
+    <div class="main-content" style="<?= $_SESSION['role'] !== 'Admin' ? 'margin-left:0' : '' ?>">
+        <div class="page-header">
+            <h1>🚚 Gestione Fornitori</h1>
+        </div>
+
+        <?php if ($message): ?>
+            <div class="alert alert-<?= $msgType === 'error' ? 'error' : 'success' ?>">
+                <?= $msgType === 'error' ? '⚠️' : '✅' ?> <?= htmlspecialchars($message) ?>
+            </div>
         <?php endif; ?>
-        <?php if ($error): ?>
-            <div class="message error"><?php echo $error; ?></div>
-        <?php endif; ?>
 
-        <form method="POST">
-            <h3>Aggiungi Fornitore</h3>
-            <input type="text" name="nome" placeholder="Nome" required>
-            <input type="text" name="indirizzo" placeholder="Indirizzo" required>
-            <input type="text" name="telefono" placeholder="Telefono" required>
-            <input type="email" name="email" placeholder="Email" required>
-            <button type="submit" name="add_supplier">Aggiungi</button>
-        </form>
+        <!-- FORM AGGIUNGI -->
+        <div style="background:var(--white);border-radius:var(--radius-md);padding:24px;box-shadow:var(--shadow-sm);margin-bottom:24px;">
+            <h2>➕ Aggiungi Fornitore</h2>
+            <form method="POST" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:12px;align-items:end;">
+                <?= csrfField() ?>
+                <div><label>Nome *</label><input type="text" name="nome" required placeholder="Nome"></div>
+                <div><label>Indirizzo *</label><input type="text" name="indirizzo" required placeholder="Indirizzo"></div>
+                <div><label>Telefono *</label><input type="text" name="telefono" required placeholder="Telefono"></div>
+                <div><label>Email *</label><input type="email" name="email" required placeholder="Email"></div>
+                <div><button type="submit" name="add_supplier" class="btn btn-primary">Aggiungi</button></div>
+            </form>
+        </div>
 
-        <div class="scrollable-table">
-            <table>
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Nome</th>
-                        <th>Indirizzo</th>
-                        <th>Telefono</th>
-                        <th>Email</th>
-                        <th>Azioni</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($fornitori as $fornitore): ?>
+        <!-- TABELLA -->
+        <div style="background:var(--white);border-radius:var(--radius-md);padding:24px;box-shadow:var(--shadow-sm);">
+            <h2>📋 Elenco Fornitori (<?= count($fornitori) ?>)</h2>
+            <div class="table-wrapper table-scroll">
+                <table>
+                    <thead>
                         <tr>
-                            <td><?php echo htmlspecialchars($fornitore['ID_Fornitore']); ?></td>
-                            <td><?php echo htmlspecialchars($fornitore['Nome']); ?></td>
-                            <td><?php echo htmlspecialchars($fornitore['Indirizzo']); ?></td>
-                            <td><?php echo htmlspecialchars($fornitore['Telefono']); ?></td>
-                            <td><?php echo htmlspecialchars($fornitore['Email']); ?></td>
+                            <th>ID</th><th>Nome</th><th>Indirizzo</th><th>Telefono</th><th>Email</th><th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($fornitori as $f): ?>
+                        <tr>
+                            <td><?= (int)$f['ID_Fornitore'] ?></td>
+                            <td><?= htmlspecialchars($f['Nome']) ?></td>
+                            <td><?= htmlspecialchars($f['Indirizzo']) ?></td>
+                            <td><?= htmlspecialchars($f['Telefono']) ?></td>
+                            <td><?= htmlspecialchars($f['Email']) ?></td>
                             <td>
-                                <form method="POST" style="display:inline-block;">
-                                    <input type="hidden" name="id" value="<?php echo $fornitore['ID_Fornitore']; ?>">
-                                    <input type="text" name="nome" placeholder="Nome" value="<?php echo htmlspecialchars($fornitore['Nome']); ?>" required>
-                                    <input type="text" name="indirizzo" placeholder="Indirizzo" value="<?php echo htmlspecialchars($fornitore['Indirizzo']); ?>" required>
-                                    <input type="text" name="telefono" placeholder="Telefono" value="<?php echo htmlspecialchars($fornitore['Telefono']); ?>" required>
-                                    <input type="email" name="email" placeholder="Email" value="<?php echo htmlspecialchars($fornitore['Email']); ?>" required>
-                                    <button type="submit" name="edit_supplier">Modifica</button>
+                                <!-- Modifica -->
+                                <form method="POST" class="edit-form">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="id" value="<?= (int)$f['ID_Fornitore'] ?>">
+                                    <input type="text" name="nome" value="<?= htmlspecialchars($f['Nome']) ?>" required>
+                                    <input type="text" name="indirizzo" value="<?= htmlspecialchars($f['Indirizzo']) ?>" required>
+                                    <input type="text" name="telefono" value="<?= htmlspecialchars($f['Telefono']) ?>" required>
+                                    <input type="email" name="email" value="<?= htmlspecialchars($f['Email']) ?>" required>
+                                    <button type="submit" name="edit_supplier" class="btn btn-sm btn-secondary">✏️ Salva</button>
                                 </form>
-                                <form method="POST" style="display:inline-block;">
-                                    <input type="hidden" name="id" value="<?php echo $fornitore['ID_Fornitore']; ?>">
-                                    <button type="submit" name="delete_supplier">Elimina</button>
+                                <!-- Elimina -->
+                                <form method="POST" class="inline" style="margin-top:4px;"
+                                      onsubmit="return confirm('Eliminare il fornitore «<?= htmlspecialchars(addslashes($f['Nome'])) ?>»?')">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="id" value="<?= (int)$f['ID_Fornitore'] ?>">
+                                    <button type="submit" name="delete_supplier" class="btn btn-sm btn-danger">🗑️ Elimina</button>
                                 </form>
                             </td>
                         </tr>
                     <?php endforeach; ?>
-                </tbody>
-            </table>
+                    <?php if (empty($fornitori)): ?>
+                        <tr><td colspan="6" class="text-center" style="color:var(--gray-700);padding:20px">Nessun fornitore.</td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
-    <a href="menu.php" class="back-button">Indietro</a>
+</div>
+<?php if ($_SESSION['role'] !== 'Admin'): ?>
+    <a href="menu.php" class="btn-back">← Indietro</a>
+<?php endif; ?>
 </body>
 </html>

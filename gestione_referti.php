@@ -1,148 +1,100 @@
 <?php
-include 'db.php';  // Connessione al database
+require_once 'db.php';
+require_once 'auth.php';
+requireAuth(['Admin', 'Dottore', 'Dottoressa']);
 
-// Recupera tutti i referti e terapie
-$stmt = $pdo->query("SELECT RefertiTerapie.ID_Referto, 
-                             Paziente.Nome AS Paziente_Nome, 
-                             Paziente.Cognome AS Paziente_Cognome, 
-                             Farmaco.Nome AS Nome_Farmaco, 
-                             Dottore.Nome AS Dottore_Nome, 
-                             RefertiTerapie.Referto, 
-                             RefertiTerapie.Terapia, 
-                             RefertiTerapie.Data_Assegnazione
-                        FROM RefertiTerapie
-                        JOIN Paziente ON RefertiTerapie.ID_Paziente = Paziente.ID_Paziente
-                        JOIN Farmaco ON RefertiTerapie.ID_Farmaco = Farmaco.ID_Farmaco
-                        JOIN Dottore ON RefertiTerapie.ID_Dottore = Dottore.ID_Dottore");
+csrfToken();
 
-$referti = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$flash = '';
+if (isset($_GET['msg'])) {
+    $msgs = ['aggiunto' => 'Referto aggiunto.', 'modificato' => 'Referto modificato.', 'eliminato' => 'Referto eliminato.'];
+    $flash = $msgs[$_GET['msg']] ?? '';
+}
+
+$stmt = $pdo->query("SELECT RT.ID_Referto,
+                            CONCAT(P.Nome,' ',P.Cognome) AS Paziente_Nome,
+                            F.Nome AS Nome_Farmaco,
+                            CONCAT(U.Nome,' ',U.Cognome) AS Dottore_Nome,
+                            RT.Referto,
+                            RT.Terapia,
+                            RT.Data_Assegnazione
+                     FROM RefertiTerapie RT
+                     JOIN Paziente P ON RT.ID_Paziente = P.ID_Paziente
+                     JOIN Farmaco F ON RT.ID_Farmaco = F.ID_Farmaco
+                     JOIN Utente U ON RT.ID_Dottore = U.ID_Utente
+                     ORDER BY RT.Data_Assegnazione DESC");
+$referti = $stmt->fetchAll();
 ?>
-
 <!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>Gestione Referti e Terapie</title>
-    <style>
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: linear-gradient(to bottom, #4caf50 50%, #ffffff 50%);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            height: 100vh;
-        }
-        .container {
-            text-align: center;
-            width: 80%;
-            max-width: 1200px;
-        }
-        h1 {
-            font-size: 24px;
-            color: #4caf50;
-            margin-bottom: 20px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        table, th, td {
-            border: 1px solid #ddd;
-        }
-        th, td {
-            padding: 10px;
-            text-align: left;
-        }
-        th {
-            background-color: #4caf50;
-            color: white;
-        }
-        .action-buttons {
-            display: flex;
-            justify-content: space-around;
-        }
-        .action-buttons a {
-            background-color: #4caf50;
-            color: white;
-            padding: 8px 16px;
-            text-decoration: none;
-            border-radius: 5px;
-            margin-top: 10px;
-        }
-        .action-buttons a:hover {
-            background-color: #45a049;
-        }
-        .back-button {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            background-color: #4caf50;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            text-decoration: none;
-        }
-        .back-button:hover {
-            background-color: #45a049;
-        }
-        .add-button {
-            background-color: #4caf50;
-            color: white;
-            padding: 8px 16px;
-            text-decoration: none;
-            border-radius: 5px;
-            margin-top: 20px;
-            display: inline-block;
-        }
-        .add-button:hover {
-            background-color: #45a049;
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Referti e Terapie — PharmaCare</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Gestione Referti e Terapie</h1>
+<div class="layout">
+    <?php if ($_SESSION['role'] === 'Admin') include 'sidebar_admin.php'; ?>
 
-        <!-- Aggiungi pulsante per nuovo referto con lo stesso stile degli altri pulsanti -->
-        <a href="aggiungi_referto_terapia.php" class="add-button">Aggiungi Nuovo Referto Terapia</a>
+    <div class="main-content" style="<?= $_SESSION['role'] !== 'Admin' ? 'margin-left:0' : '' ?>">
+        <div class="page-header flex justify-between items-center">
+            <h1>📋 Gestione Referti e Terapie</h1>
+            <a href="aggiungi_referto_terapia.php" class="btn btn-primary">➕ Nuovo Referto</a>
+        </div>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>ID Referto</th>
-                    <th>Paziente</th>
-                    <th>Farmaco</th>
-                    <th>Dottore</th>
-                    <th>Referto</th>
-                    <th>Terapia</th>
-                    <th>Data Assegnazione</th>
-                    <th>Azioni</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($referti as $referto): ?>
-                    <tr>
-                        <td><?= $referto['ID_Referto'] ?></td>
-                        <td><?= $referto['Paziente_Nome'] ?> <?= $referto['Paziente_Cognome'] ?></td>
-                        <td><?= $referto['Nome_Farmaco'] ?></td> <!-- Correzione qui: Nome_Farmaco -->
-                        <td><?= $referto['Dottore_Nome'] ?></td>
-                        <td><?= $referto['Referto'] ?></td>
-                        <td><?= $referto['Terapia'] ?></td>
-                        <td><?= $referto['Data_Assegnazione'] ?></td>
-                        <td class="action-buttons">
-                            <a href="modifica_referto_terapia.php?id_referto=<?= $referto['ID_Referto'] ?>">Modifica</a>
-                            <a href="elimina_referto_terapia.php?id_referto=<?= $referto['ID_Referto'] ?>" onclick="return confirm('Sei sicuro di voler eliminare questo referto?')">Elimina</a>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
+        <?php if ($flash): ?>
+            <div class="alert alert-success">✅ <?= htmlspecialchars($flash) ?></div>
+        <?php endif; ?>
+
+        <div style="background:var(--white);border-radius:var(--radius-md);padding:24px;box-shadow:var(--shadow-sm);">
+            <h2>📋 Elenco Referti (<?= count($referti) ?>)</h2>
+            <div class="table-wrapper table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Paziente</th>
+                            <th>Farmaco</th>
+                            <th>Dottore</th>
+                            <th>Referto</th>
+                            <th>Terapia</th>
+                            <th>Data</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($referti as $r): ?>
+                        <tr>
+                            <td><?= (int)$r['ID_Referto'] ?></td>
+                            <td><?= htmlspecialchars($r['Paziente_Nome']) ?></td>
+                            <td><?= htmlspecialchars($r['Nome_Farmaco']) ?></td>
+                            <td><?= htmlspecialchars($r['Dottore_Nome']) ?></td>
+                            <td><?= htmlspecialchars($r['Referto']) ?></td>
+                            <td><?= htmlspecialchars($r['Terapia']) ?></td>
+                            <td><?= htmlspecialchars($r['Data_Assegnazione']) ?></td>
+                            <td class="actions-cell">
+                                <a href="modifica_referto_terapia.php?id_referto=<?= (int)$r['ID_Referto'] ?>" class="btn btn-sm btn-secondary">✏️ Modifica</a>
+                                <form method="post" action="elimina_referto_terapia.php" class="inline"
+                                      onsubmit="return confirm('Eliminare il referto #<?= (int)$r['ID_Referto'] ?>?')">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="id_referto" value="<?= (int)$r['ID_Referto'] ?>">
+                                    <button type="submit" class="btn btn-sm btn-danger">🗑️ Elimina</button>
+                                </form>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($referti)): ?>
+                        <tr><td colspan="8" class="text-center" style="color:var(--gray-700);padding:20px">Nessun referto presente.</td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
-
-    <a href="menu.php" class="back-button">Indietro</a>
+</div>
+<?php if ($_SESSION['role'] !== 'Admin'): ?>
+    <a href="menu.php" class="btn-back">← Indietro</a>
+<?php endif; ?>
 </body>
 </html>

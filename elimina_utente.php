@@ -1,32 +1,30 @@
 <?php
-// Includi la configurazione del database
-require_once 'config.php';
-session_start();
+require_once 'db.php';
+require_once 'auth.php';
+requireAuth('Admin');
 
-// Controlla se l'utente è autenticato e se è un admin
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'Admin') {
-    header("Location: login.php");
+// Solo POST è accettato (form con CSRF)
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('Location: gestione_utenti.php');
     exit;
 }
 
-// Verifica se è stato passato un ID
-if (!isset($_GET['id'])) {
-    header("Location: gestione_utenti.php");
+verifyCsrf();
+
+$id = (int)($_POST['id'] ?? 0);
+if ($id <= 0) {
+    header('Location: gestione_utenti.php');
     exit;
 }
 
-// Recupera l'ID dell'utente da eliminare
-$userId = $_GET['id'];
-
-// Prepara la query per eliminare l'utente (assumendo che la colonna sia ID_Utente)
-$query = "DELETE FROM Utente WHERE ID_Utente = :id";
-$stmt = $conn->prepare($query);
-$stmt->bindParam(':id', $userId, PDO::PARAM_INT);
-
-if ($stmt->execute()) {
-    header("Location: gestione_utenti.php");
+// Proteggi l'admin loggato: non può eliminare se stesso
+if ($id === (int)$_SESSION['user_id']) {
+    header('Location: gestione_utenti.php?err=selfdelete');
     exit;
-} else {
-    echo "Errore durante l'eliminazione dell'utente.";
 }
-?>
+
+$stmt = $pdo->prepare("DELETE FROM Utente WHERE ID_Utente = ?");
+$stmt->execute([$id]);
+
+header('Location: gestione_utenti.php?msg=eliminato');
+exit;
