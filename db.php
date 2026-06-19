@@ -5,12 +5,47 @@
 // Variabile di connessione: $pdo
 // =============================================
 
-// TODO produzione: spostare queste credenziali in variabili d'ambiente (.env)
-define('DB_HOST', 'localhost');
-define('DB_NAME', 'farmaciaospedaliera');
-define('DB_USER', 'root');
-define('DB_PASS', 'root12345');
-define('DB_CHARSET', 'utf8mb4');
+// Carica variabili d'ambiente da .env
+function loadEnv($filePath = __DIR__ . '/.env') {
+    if (!file_exists($filePath)) {
+        return;
+    }
+    
+    $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        // Skip comments
+        if (strpos($line, '#') === 0) {
+            continue;
+        }
+        
+        // Parse KEY=VALUE
+        if (strpos($line, '=') !== false) {
+            list($key, $value) = explode('=', $line, 2);
+            $key = trim($key);
+            $value = trim($value);
+            
+            // Remove quotes if present
+            if (in_array($value[0] ?? '', ['"', "'"], true)) {
+                $value = substr($value, 1, -1);
+            }
+            
+            if (!isset($_ENV[$key])) {
+                $_ENV[$key] = $value;
+                putenv("$key=$value");
+            }
+        }
+    }
+}
+
+// Load environment variables
+loadEnv();
+
+// Get database credentials from environment variables
+define('DB_HOST', $_ENV['DB_HOST'] ?? 'localhost');
+define('DB_NAME', $_ENV['DB_NAME'] ?? 'farmaciaospedaliera');
+define('DB_USER', $_ENV['DB_USER'] ?? 'root');
+define('DB_PASS', $_ENV['DB_PASS'] ?? '');
+define('DB_CHARSET', $_ENV['DB_CHARSET'] ?? 'utf8mb4');
 
 try {
     $pdo = new PDO(
